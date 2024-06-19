@@ -1,7 +1,6 @@
 # Computer Vision Project
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/anasmoufid1/computervision/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Project Overview
 
