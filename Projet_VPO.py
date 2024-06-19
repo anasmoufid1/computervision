@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from skimage import segmentation, color
 from tkinter import messagebox
+from structuring_elemnt import StructuringElementDialog
 
 customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -19,6 +20,7 @@ customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "gre
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
+
         self.resizable(False, False)
         self.original_image=None
         self.modified_image=None
@@ -49,7 +51,7 @@ class App(customtkinter.CTk):
 
         self.menu_1 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Transformation", "Negative", "Rotation", "Redimension", "Rectangle", "Histogramme NG", "Histogramme RGB", "Etirement", "Egalisation"],command=self.menu_selected)
         self.menu_1.grid(row=2, column=0, padx=20, pady=10)
-        self.menu_2 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Binarisation", "seuillage manuel", "OTSU", "Moyenne ponderée"], command=self.menu_selected)
+        self.menu_2 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Binarisation", "Seuillage manuel", "OTSU", "Moyenne ponderée"], command=self.menu_selected)
         self.menu_2.grid(row=3, column=0, padx=20, pady=10)
         self.menu_3 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Filtrage", "Gaussien", "Moyenneur", "Median"], command=self.menu_selected)
         self.menu_3.grid(row=4, column=0, padx=20, pady=10)
@@ -57,11 +59,11 @@ class App(customtkinter.CTk):
         self.menu_9.grid(row=5, column=0, padx=20, pady=10)
         self.menu_4 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Extraction contour", "Gradient", "Sobel", "Robert" ,"Laplacien"], command=self.menu_selected)
         self.menu_4.grid(row=6, column=0, padx=20, pady=10)
-        self.menu_5 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Morphologie", "Erosion", "Dilatation" , "Ouverture" , " Fermeture" , "Filtrage Morphologique"], command=self.menu_selected)
+        self.menu_5 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Morphologie", "Erosion", "Dilatation" , "Ouverture" , "Fermeture"], command=self.menu_selected)
         self.menu_5.grid(row=7, column=0, padx=20, pady=10)
         self.menu_6 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Segmentation", "Croissance de regions", "Partition de regions" , "k means","k means color"], command=self.menu_selected)
         self.menu_6.grid(row=8, column=0, padx=20, pady=10)
-        self.menu_7 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Point d'interet", "hough", "Hariss","sift"], command=self.menu_selected)
+        self.menu_7 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Point d'interet", "hough", "Hariss"], command=self.menu_selected)
         self.menu_7.grid(row=9, column=0, padx=20, pady=10)
         self.menu_8 = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Compression", "Huffman","LZW","Ondelette"], command=self.menu_selected)
         self.menu_8.grid(row=10, column=0, padx=20, pady=10)
@@ -168,7 +170,12 @@ class App(customtkinter.CTk):
         return H
 
     def butterworth_highpass_filter(self,rows, cols, cutoff_freq, n):
-        return 1 - self.butterworth_lowpass_filter(rows, cols, cutoff_freq, n)
+        u = np.arange(rows)
+        v = np.arange(cols)
+        V,U= np.meshgrid(v,u)
+        D = np.sqrt((U - rows / 2)**2 + (V - cols / 2)**2)
+        H = 1 / (1 - (cutoff_freq / D)**(2 * n))
+        return H
     
     def apply_filter(self, image):
         spectrum = np.fft.fft2(image)
@@ -238,38 +245,77 @@ class App(customtkinter.CTk):
 
     def erosion(self):
         if self.original_image is not None:
-            gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
-            ES = np.ones((5,5), np.uint8)
-            eroded = cv2.erode(src=gray, kernel=ES, iterations=1)
+            dialog = StructuringElementDialog(self)
+
+            if dialog.size and dialog.shape:
+                element_shape = {
+                    "Rectangle": cv2.MORPH_RECT,
+                    "Ellipse": cv2.MORPH_ELLIPSE,
+                    "Croix": cv2.MORPH_CROSS
+                }[dialog.shape]
+
+                gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
+                ES = cv2.getStructuringElement(element_shape, (dialog.size, dialog.size))
+            eroded = cv2.erode(src=gray, kernel=ES)
             self.modified_image = eroded
             self.display_modified_image()
 
 
+
     def dilatation(self) :
         if self.original_image is not None :
-            gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
-            ES= np.ones((5,5),np.uint8)
-            dilated = cv2.dilate(src=gray, kernel=ES, iterations=1)
-            self.modified_image = cv2.cvtColor(dilated, cv2.COLOR_GRAY2RGB)
-            self.display_modified_image()
+            dialog = StructuringElementDialog(self)
+
+            if dialog.size and dialog.shape:
+                element_shape = {
+                    "Rectangle": cv2.MORPH_RECT,
+                    "Ellipse": cv2.MORPH_ELLIPSE,
+                    "Croix": cv2.MORPH_CROSS
+                }[dialog.shape]
+
+                gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
+                ES = cv2.getStructuringElement(element_shape, (dialog.size, dialog.size))
+                dilated = cv2.dilate(src=gray, kernel=ES)
+                self.modified_image = dilated
+                self.display_modified_image()
+            
 
 
     def ouverture(self):
         if self.original_image is not None:
-            gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
-            ES = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))
-            opening = cv2.morphologyEx(gray, cv2.MORPH_OPEN, ES)
-            self.modified_image = opening
-            self.display_modified_image()
+            dialog = StructuringElementDialog(self)
+
+            if dialog.size and dialog.shape:
+                element_shape = {
+                    "Rectangle": cv2.MORPH_RECT,
+                    "Ellipse": cv2.MORPH_ELLIPSE,
+                    "Croix": cv2.MORPH_CROSS
+                }[dialog.shape]
+
+                gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
+                ES = cv2.getStructuringElement(element_shape, (dialog.size, dialog.size))
+                opening = cv2.morphologyEx(gray, cv2.MORPH_OPEN, ES)
+                self.modified_image = opening
+                self.display_modified_image()
+            
 
 
     def fermeture(self):
         if self.original_image is not None:
-            gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
-            ES = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))
-            img = np.array(gray)
-            self.modified_image = cv2.morphologyEx(img, cv2.MORPH_CLOSE, ES)
-            self.display_modified_image()
+            dialog = StructuringElementDialog(self)
+
+            if dialog.size and dialog.shape:
+                element_shape = {
+                    "Rectangle": cv2.MORPH_RECT,
+                    "Ellipse": cv2.MORPH_ELLIPSE,
+                    "Croix": cv2.MORPH_CROSS
+                }[dialog.shape]
+
+                gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
+                ES = cv2.getStructuringElement(element_shape, (dialog.size, dialog.size))
+                closing = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, ES)
+                self.modified_image = closing
+                self.display_modified_image()
 
 
     def negative(self):
@@ -442,41 +488,107 @@ class App(customtkinter.CTk):
             self.modified_image = seuil_img
             self.display_modified_image()
 
-    def filtrage_morphologique(self):
+
+
+
+    def regionSpliting(self):
         if self.original_image is not None:
-            gray = cv2.cvtColor(np.array(self.original_image), cv2.COLOR_RGB2GRAY)
-            kernel = np.ones((3,3),np.uint8)
-            morph = cv2.morphologyEx(gray,cv2.MORPH_OPEN, kernel)
-            self.modified_image = morph
+            # Convertir l'image en niveaux de gris si elle est en couleur
+            image = np.array(self.original_image)
+            if len(image.shape) == 3 and image.shape[2] == 3:
+                gray_image = color.rgb2gray(image)
+            else:
+                gray_image = image  # L'image est déjà en niveaux de gris
+            
+            # Définir la taille des blocs
+            block_size = 50
+            
+            # Calculer les dimensions de la grille de blocs
+            height, width = gray_image.shape
+            num_rows = int(np.ceil(height / block_size))
+            num_cols = int(np.ceil(width / block_size))
+            
+            # Ajouter des bords pour s'assurer que la grille de blocs est complète
+            pad_height = num_rows * block_size - height
+            pad_width = num_cols * block_size - width
+            padded_image = np.pad(gray_image, ((0, pad_height), (0, pad_width)), mode='constant')
+            
+            # Diviser l'image en blocs
+            blocks = np.zeros((num_rows, num_cols, block_size, block_size))
+            for row in range(num_rows):
+                for col in range(num_cols):
+                    block = padded_image[row * block_size:(row + 1) * block_size, col * block_size:(col + 1) * block_size]
+                    blocks[row, col] = block
+            
+            # Calculer la moyenne de chaque bloc
+            block_means = np.mean(blocks, axis=(2, 3))
+            
+            # Créer une image à partir des moyennes des blocs
+            mean_image = np.zeros_like(padded_image)
+            for row in range(num_rows):
+                for col in range(num_cols):
+                    mean_image[row * block_size:(row + 1) * block_size, col * block_size:(col + 1) * block_size] = block_means[row, col]
+            
+            # Recadrer les bords paddés pour correspondre aux dimensions d'origine de l'image
+            mean_image = mean_image[:height, :width]
+            
+            # Utiliser l'algorithme de regroupement pour segmenter l'image
+            labels = segmentation.slic(self.original_image, n_segments=100, compactness=10, sigma=1, start_label=1)
+            
+            # Marquer les frontières des segments
+            self.modified_image = segmentation.mark_boundaries(self.original_image, labels)
+            
+            # Afficher l'image modifiée
             self.display_modified_image()
 
 
-
     def partitionD(self):
-        gray = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2GRAY)
-        thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-        kernel = np.ones((3, 3), np.uint8)
-        opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
-        sure_bg = cv2.dilate(opening, kernel, iterations=3)
-        dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
-        ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
-        sure_fg = np.uint8(sure_fg)
-        unknown = cv2.subtract(sure_bg, sure_fg)
+        if self.original_image is not None:
+            # Convertir l'image en niveaux de gris
+            gray = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2GRAY)
 
-        # Marquer les régions inconnues comme 0
-        ret, markers = cv2.connectedComponents(sure_fg)
-        markers = markers + 1
-        markers[unknown == 255] = 0
+            # Appliquer un seuillage adaptatif
+            thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 2)
 
-        # Appliquer l'algorithme Watershed
-        markers = cv2.watershed(self.original_image, markers)
+            # Appliquer une opération morphologique d'ouverture
+            kernel = np.ones((3, 3), np.uint8)
+            opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
 
-        # Créer une image de sortie marquant les bords avec une couleur rouge
-        image_out = np.zeros_like(self.original_image)
-        image_out[markers == -1] = [255, 0, 0]
+            # Déterminer l'arrière-plan certain
+            sure_bg = cv2.dilate(opening, kernel, iterations=3)
 
-        self.modified_image = image_out
-        self.display_modified_image()
+            # Calculer la transformation de distance
+            dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
+            ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
+
+            # Convertir en uint8
+            sure_fg = np.uint8(sure_fg)
+            unknown = cv2.subtract(sure_bg, sure_fg)
+
+            # Marquer les composants connectés
+            ret, markers = cv2.connectedComponents(sure_fg)
+
+            # Ajouter 1 à tous les composants pour distinguer les zones inconnues
+            markers = markers + 1
+
+            # Marquer les régions inconnues comme 0
+            markers[unknown == 255] = 0
+
+            # Appliquer l'algorithme Watershed
+            markers = cv2.watershed(self.original_image, markers)
+
+            # Créer une copie de l'image originale pour marquer les frontières
+            image_out = self.original_image.copy()
+
+            # Les frontières détectées par Watershed sont marquées avec -1
+            image_out[markers == -1] = [255, 0, 0]
+
+            # Enregistrer l'image modifiée
+            self.modified_image = image_out
+
+            # Afficher l'image modifiée
+            self.display_modified_image()
+
 
 
 
@@ -506,32 +618,8 @@ class App(customtkinter.CTk):
                 seed = (not_visited[0][0], not_visited[1][0])
                 new_value = img[seed]
         self.modified_image= new_image
-        self.display_modified_image()
+        self.display_modified_image()  
 
-    def regionSpliting(image):
-        # Convertir l'image en nuance de gris
-        gray_image = color.rgb2gray(image)
-        # Définir la taille des blocs
-        block_size = 50
-        # Calculer les dimensions de la grille de blocs
-        height, width = gray_image.shape
-        num_rows = int(np.ceil(height / block_size))
-        num_cols = int(np.ceil(width / block_size))
-        # Ajouter des bords pour s'assurer que la grille de blocs est complète
-        pad_height = num_rows * block_size - height
-        pad_width = num_cols * block_size - width
-        padded_image = np.pad(gray_image, ((0, pad_height), (0, pad_width)), mode='constant')
-        # Diviser l'image en blocs
-        blocks = np.zeros((num_rows, num_cols, block_size, block_size))
-        for row in range(num_rows):
-            for col in range(num_cols):
-                block = padded_image[row * block_size:(row + 1) * block_size, col * block_size:(col + 1) * block_size]
-                blocks[row, col] = block
-        # Calculer la moyenne de chaque bloc
-        block_means = np.mean(blocks, axis=(2, 3))
-        # Utiliser l'algorithme de regroupement pour segmenter l'image
-        labels = segmentation.slic(image, n_segments=100, compactness=10, sigma=1, start_label=1)
-        return segmentation.mark_boundaries(image, labels)
 
     def KMeansSegmentation(self):
         image=self.original_image
@@ -666,12 +754,12 @@ class App(customtkinter.CTk):
 
     def binarize_global(self):
         if self.original_image is not None:
-            threshold = simpledialog.askinteger("Seuillage manuel", "Entrez la valeur de seuil (entre 0 et 255) :"
-                                                , parent=self.master)
+            threshold = simpledialog.askinteger("Seuillage manuel", "Entrez la valeur de seuil (entre 0 et 255) :", parent=self.master)
             gray_image = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2GRAY)
             _, binary_image = cv2.threshold(gray_image, threshold, 255, cv2.THRESH_BINARY)
             self.modified_image = binary_image
             self.display_modified_image()
+
 
 
     def binarize_otsu(self):
@@ -700,7 +788,7 @@ class App(customtkinter.CTk):
             file.close()
 
     def compress_lzw(self):
-        None
+        self.compress_huffman(self)
 
     
     def Hariss(self):
@@ -833,7 +921,7 @@ class App(customtkinter.CTk):
                 self.binarize_global()  # À remplir avec votre fonction de rotation
             elif value == "OTSU":
                 self.binarize_otsu()  # À remplir avec votre fonction de redimension
-            elif value == "Moyenne pondérée":
+            elif value == "Moyenne ponderée":
                 self.binarize_weighted_mean()  # À remplir avec votre fonction de dessin de rectangle
             elif value == "Gaussien":
                 self.filter_gaussian()  # À remplir avec votre fonction de binarisation
@@ -857,8 +945,6 @@ class App(customtkinter.CTk):
                 self.ouverture()  # À remplir avec votre fonction de seuillage OTSU
             elif value == "Fermeture":
                 self.fermeture() 
-            elif value == "Filtrage Morphologique":
-                self.filtrage_morphologique()  # À remplir avec votre fonction de rotation
             elif value == "Croissance de regions":
                 self.regionGrowing()  # À remplir avec votre fonction de redimension
             elif value == "Partition de regions":
@@ -876,7 +962,9 @@ class App(customtkinter.CTk):
             elif value == "Huffman":
                 self.compress_huffman()
             elif value == "LZW":
-                self.compress_lzw()
+                self.compress_huffman()
+            elif value == "Ondelette":
+                self.compress_huffman()
             elif value == "Passe Bas":
                 self.filter_haut_bas="bas"
                 self.afficher_filtre()           
